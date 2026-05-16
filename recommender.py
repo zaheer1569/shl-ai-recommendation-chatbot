@@ -1,24 +1,23 @@
-import pickle
-from sentence_transformers import SentenceTransformer
+import json
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+with open("catalog.json", "r", encoding="utf-8") as f:
+    products = json.load(f)
 
-with open("embeddings.pkl", "rb") as f:
-    data = pickle.load(f)
+texts = [
+    f"{item.get('name', '')} {item.get('description', '')}"
+    for item in products
+]
 
-products = data["products"]
-embeddings = data["embeddings"]
+vectorizer = TfidfVectorizer()
+tfidf_matrix = vectorizer.fit_transform(texts)
 
 def recommend(query, top_k=3):
-    query_embedding = model.encode([query])
+    query_vector = vectorizer.transform([query])
 
-    similarities = cosine_similarity(query_embedding, embeddings)[0]
+    similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
 
-    ranked = sorted(
-         zip(products, similarities),
-         key=lambda x: x[1],
-         reverse=True
-    )
+    ranked_indices = similarities.argsort()[::-1][:top_k]
 
-    return [item[0] for item in ranked[:top_k]]
+    return [products[i] for i in ranked_indices]
